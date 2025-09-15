@@ -1,0 +1,30 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# Local envs
+.env
+.venv/
+
+# Outputs and logs
+outputs/
+logs/
+CellBench/responses/
+CellBench/judged/
+
+# Data (optional large)
+example/*.h5ad
+CellBench/data/*.csv
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store

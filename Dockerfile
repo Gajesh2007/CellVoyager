@@ -14,19 +14,18 @@ RUN micromamba install -y -n base -f /tmp/env.yaml \
 # Environment for reliable, headless execution
 ENV MPLBACKEND=Agg \
     PYTHONUNBUFFERED=1 \
-    PYTHONIOENCODING=UTF-8
+    PYTHONIOENCODING=UTF-8 \
+    PATH=/opt/conda/bin:$PATH
 
 # Copy source
 COPY --chown=$MAMBA_USER:$MAMBA_USER . /app
 
-# Download the example dataset so defaults work out-of-the-box (use wget inside conda env)
-RUN micromamba install -y -n base -c conda-forge wget \
-    && micromamba clean -a -y
-RUN mkdir -p example \
-    && micromamba run -n base wget -O example/covid19.h5ad "https://hosted-matrices-prod.s3-us-west-2.amazonaws.com/Single_cell_atlas_of_peripheral_immune_response_to_SARS_CoV_2_infection-25/Single_cell_atlas_of_peripheral_immune_response_to_SARS_CoV_2_infection.h5ad"
+# Example dataset is copied from the repository (ensure .dockerignore does not exclude it)
 
-# Provide a simple entrypoint; ensure conda env is active at runtime
-ENTRYPOINT ["micromamba", "run", "-n", "base", "--", "python", "run.py"]
-CMD []
+# Ensure downstream layered builds (e.g., EigenCloud) run as root so they can modify /usr/local/bin
+USER root
+
+# Default command; conda's Python is on PATH so this runs the app directly
+CMD ["python", "run.py"]
 
 

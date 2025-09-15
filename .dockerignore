@@ -19,8 +19,7 @@ logs/
 CellBench/responses/
 CellBench/judged/
 
-# Data (optional large)
-example/*.h5ad
+# Data (keep the example .h5ad so it can be copied into the image)
 CellBench/data/*.csv
 
 # Jupyter

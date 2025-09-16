@@ -10,6 +10,7 @@ import {DonationSBT} from "./DonationSBT.sol";
 /// @dev Users can bump a research's priority once every 24 hours. Owner manages authorized submitters and public key.
 contract GovernanceQueue is Ownable, ReentrancyGuard {
     error NotAuthorized();
+    error NotAgent();
     error CooldownActive(uint256 secondsRemaining);
     error InvalidResearch();
     error NoVotingPower();
@@ -39,6 +40,12 @@ contract GovernanceQueue is Ownable, ReentrancyGuard {
 
     DonationSBT public immutable governanceToken;
     string public publicEncryptionKey; // Public key string used to encrypt dataset path off-chain
+    address public immutable agent;
+
+    modifier onlyAgent() {
+        if (msg.sender != agent) revert NotAgent();
+        _;
+    }
 
     // Authorized dataset submitters
     mapping(address => bool) public isAuthorized;
@@ -50,18 +57,20 @@ contract GovernanceQueue is Ownable, ReentrancyGuard {
     mapping(address => uint64) public lastBumpAt;
     uint64 public constant COOLDOWN_SECONDS = 24 hours;
 
-    constructor(address initialOwner, DonationSBT sbt, string memory initialPublicKey) Ownable(initialOwner == address(0) ? msg.sender : initialOwner) {
+    constructor(address initialOwner, address initialAgent,
+    DonationSBT sbt, string memory initialPublicKey) Ownable(initialOwner == address(0) ? msg.sender : initialOwner) {
         governanceToken = sbt;
         publicEncryptionKey = initialPublicKey;
+        agent = initialAgent;
     }
 
     // --- Admin ---
-    function setPublicEncryptionKey(string calldata newKey) external onlyOwner {
+    function setPublicEncryptionKey(string calldata newKey) external onlyAgent {
         emit PublicKeyUpdated(publicEncryptionKey, newKey);
         publicEncryptionKey = newKey;
     }
 
-    function setAuthorized(address account, bool authorized) external onlyOwner {
+    function setAuthorized(address account, bool authorized) external onlyAgent {
         isAuthorized[account] = authorized;
         emit AuthorizedUpdated(account, authorized);
     }

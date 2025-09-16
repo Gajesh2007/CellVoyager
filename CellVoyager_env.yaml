@@ -25,4 +25,6 @@ dependencies:
   - pip:
       - openai
       - celltypist
+      - web3==6.20.0
+      - pycryptodome==3.20.0
 

@@ -50,7 +50,7 @@ contract GovernanceQueueTest is Test {
     function setUp() public {
         vm.startPrank(admin);
         sbt = new DonationSBT(admin);
-        gq = new GovernanceQueue(admin, sbt, "PUB_KEY");
+        gq = new GovernanceQueue(admin, admin, sbt, "PUB_KEY");
         vm.stopPrank();
 
         token = new MockERC20();

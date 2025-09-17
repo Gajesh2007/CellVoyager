@@ -89,9 +89,6 @@ def _load_openai_api_key() -> Optional[str]:
     return None
 
 
- 
-
-
 def connect_web3(rpc_url: str) -> Web3:
     w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": 30}))
     # Optional: POA middleware for some testnets

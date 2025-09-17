@@ -60,7 +60,9 @@ contract GovernanceQueue is Ownable, ReentrancyGuard {
     uint64 public constant COOLDOWN_SECONDS = 24 hours;
 
     constructor(address initialOwner, address initialAgent,
-    DonationSBT sbt, string memory initialPublicKey) Ownable(initialOwner == address(0) ? msg.sender : initialOwner) {
+    DonationSBT sbt, string memory initialPublicKey) Ownable(address(0)) {
+        address ownerToSet = initialOwner == address(0) ? msg.sender : initialOwner;
+        _transferOwnership(ownerToSet);
         governanceToken = sbt;
         publicEncryptionKey = initialPublicKey;
         agent = initialAgent;

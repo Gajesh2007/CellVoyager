@@ -1,0 +1,17 @@
+
+# Secrets
+.env
+
+# Python cache and artifacts
+__pycache__/
+*.pyc
+
+# Outputs and logs
+outputs/
+logs/
+
+# Large example data
+example/*.h5ad
+
+keys/
+downloads/

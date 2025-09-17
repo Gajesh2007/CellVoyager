@@ -265,7 +265,7 @@ class AnalysisAgent:
         # Keep only the most recent cells up to code_memory_size
         self.code_memory = code_cells[-self.code_memory_size:] if len(code_cells) > 0 else []
         
-    def generate_next_step_analysis(self, analysis, attempted_analyses, notebook_cells, results_interpretation, num_steps_left):
+    def generate_next_step_analysis(self, analysis, attempted_analyses, notebook_cells, results_interpretation, num_steps_left, seeded=False):
         hypothesis = analysis["hypothesis"]
         analysis_plan = analysis["analysis_plan"]
         first_step_code = analysis["first_step_code"]
@@ -280,10 +280,16 @@ class AnalysisAgent:
 
         if seeded:
             prompt = open(os.path.join(self.prompt_dir, "next_step_seeded.txt")).read()
-            prompt = prompt.format(hypothesis=hypothesis, analysis_plan = analysis_plan, num_steps_left=num_steps_left,
-                                 CODING_GUIDELINES=self.coding_guidelines, jupyter_notebook=jupyter_summary,
-                                 jupyter_notebook=jupyter_summary, adata_summary=self.adata_summary, past_analyses=attempted_analyses,
-                                 paper_txt=self.paper_summary)
+            prompt = prompt.format(
+                                hypothesis=hypothesis,
+                                analysis_plan=analysis_plan,
+                                num_steps_left=num_steps_left,
+                                CODING_GUIDELINES=self.coding_guidelines,
+                                jupyter_notebook=jupyter_summary,
+                                adata_summary=self.adata_summary,
+                                past_analyses=attempted_analyses,
+                                paper_txt=self.paper_summary
+                            )
         else:
             prompt = open(os.path.join(self.prompt_dir, "next_step.txt")).read()
             prompt = prompt.format(hypothesis=hypothesis, analysis_plan=analysis_plan,

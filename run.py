@@ -2,11 +2,52 @@ import os
 import json
 import argparse
 import openai
+from dotenv import load_dotenv
 from agent import AnalysisAgent
-from notebook_generator import generate_notebook
+
+
+def _load_openai_api_key():
+    """Load OPENAI_API_KEY from env, env-provided file, or common Docker secret paths."""
+    # 1) Direct env
+    key = os.getenv("OPENAI_API_KEY")
+    if key:
+        return key
+
+    # 2) File path in env
+    candidate_paths = []
+    env_file = os.getenv("OPENAI_API_KEY_FILE")
+    if env_file:
+        candidate_paths.append(env_file)
+
+    # 3) Common secret mount paths
+    candidate_paths.extend([
+        "/run/secrets/openai_api_key",
+        "/run/secrets/OPENAI_API_KEY",
+        "/var/run/secrets/openai_api_key",
+        "/var/run/secrets/OPENAI_API_KEY",
+        "/etc/secrets/openai_api_key",
+        "/etc/secrets/OPENAI_API_KEY",
+    ])
+
+    for path in candidate_paths:
+        try:
+            if path and os.path.exists(path):
+                with open(path, "r") as f:
+                    content = f.read().strip()
+                    if content:
+                        return content
+        except Exception:
+            continue
+
+    return None
 
 
 def main():
+    # Load .env if present (works both locally and in Docker images that bundle a .env)
+    try:
+        load_dotenv()
+    except Exception:
+        pass
     parser = argparse.ArgumentParser(description="Run CellVoyager analysis agent")
     
     # REQUIRED arguments
@@ -73,11 +114,11 @@ def main():
     
     args = parser.parse_args()
     
-    # Check if OpenAI API key is available
-    openai_api_key = os.getenv('OPENAI_API_KEY')
+    # Check if OpenAI API key is available (env, secret files, or .env)
+    openai_api_key = _load_openai_api_key()
     if not openai_api_key:
-        print("❌ Error: OPENAI_API_KEY environment variable not set")
-        print("Please set your OpenAI API key: export OPENAI_API_KEY='your-key-here'")
+        print("❌ Error: OpenAI API key not found.")
+        print("Searched OPENAI_API_KEY, OPENAI_API_KEY_FILE, and common Docker secret paths (e.g., /run/secrets/openai_api_key).")
         return 1
     
     # Check if required files exist

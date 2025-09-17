@@ -180,7 +180,11 @@ def process_research_queue(
     items = []
     for i in range(count):
         r = contract.functions.getResearch(i).call()
-        items.append((i, {
+        # Expected tuple layout (per frontend ABI):
+        # 0 analysisName, 1 description, 2 encryptedH5adPath, 3 modelName,
+        # 4 numAnalyses, 5 maxIterations, 6 submitter, 7 createdAt,
+        # 8 completed, 9 completedAt, 10 priority, 11 totalVotes
+        item = {
             "analysisName": r[0],
             "description": r[1],
             "encryptedH5adPath": r[2],
@@ -189,9 +193,12 @@ def process_research_queue(
             "maxIterations": int(r[5]),
             "submitter": r[6],
             "createdAt": int(r[7]),
-            "priority": int(r[8]),
-            "totalVotes": int(r[9]),
-        }))
+            "completed": bool(r[8]),
+            "completedAt": int(r[9]),
+            "priority": int(r[10]),
+            "totalVotes": int(r[11]),
+        }
+        items.append((i, item))
 
     # Sort by current priority desc, then earliest created
     items.sort(key=lambda x: (-x[1]["priority"], x[1]["createdAt"]))
@@ -199,6 +206,8 @@ def process_research_queue(
     # Find the first processable item (decryptable URL)
     chosen: Optional[Tuple[int, dict]] = None
     for research_id, meta in items:
+        if meta.get("completed"):
+            continue
         decrypted = decrypt_envelope_or_oaep(meta["encryptedH5adPath"], private_pem)
         if not decrypted:
             continue

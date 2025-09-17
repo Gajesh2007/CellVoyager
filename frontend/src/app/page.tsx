@@ -153,9 +153,10 @@ export default function Home() {
 	const [donation, setDonation] = useState({ token: DONATION_TOKEN_ADDR, amount: "" });
 	async function onDonate() {
 		if (!SBT_ADDR) return alert("Missing NEXT_PUBLIC_SBT_ADDRESS");
+		if (!publicClient) return alert("Public client not ready");
 		const decsData = await (async () => {
 			try {
-				return await (window as any).wagmi?.getClient?.()?.readContract({ address: DONATION_TOKEN_ADDR, abi: erc20Abi, functionName: "decimals" });
+				return await publicClient.readContract({ address: DONATION_TOKEN_ADDR, abi: erc20Abi as any, functionName: "decimals", args: [] });
 			} catch {
 				return 18;
 			}
@@ -169,7 +170,7 @@ export default function Home() {
 		queryClient.invalidateQueries({ queryKey: ["votes"] });
 	}
 
-	const { data: count } = useQuery({
+	const { data: count } = useQuery<number>({
     queryKey: ["count", GOV_ADDR],
     queryFn: async () => {
       if (!GOV_ADDR || !publicClient) return 0;
@@ -180,16 +181,16 @@ export default function Home() {
 	    refetchOnReconnect: false,
 	    staleTime: 30_000,
 	    gcTime: 300_000,
-	    keepPreviousData: true,
+	    placeholderData: (prev) => (typeof prev === "number" ? prev : 0),
 	  });
   const items = useMemo(() => Number(count || 0), [count]);
 
-	const { data: queue, isLoading: queueLoading } = useQuery({
+	const { data: queue = [] as any[], isLoading: queueLoading } = useQuery<any[]>({
 		queryKey: ["queue", items, GOV_ADDR],
 		queryFn: async () => {
 			if (!GOV_ADDR || !publicClient) return [] as any[];
 			if (!items) return [] as any[];
-			const range: any = await publicClient.readContract({ address: GOV_ADDR, abi: governanceAbi as any, functionName: "getResearchRange", args: [0n, BigInt(items)] });
+			const range: any = await publicClient.readContract({ address: GOV_ADDR, abi: governanceAbi as any, functionName: "getResearchRange", args: [BigInt(0), BigInt(items)] });
 			const arr = (range as any[]).map((r: any, i: number) => {
 				const analysisName = r?.analysisName ?? r?.[0] ?? "";
 				const description = r?.description ?? r?.[1] ?? "";
@@ -200,14 +201,14 @@ export default function Home() {
 				return { id: i, analysisName, description, modelName, priority, createdAt, completed };
 			});
 			// Cache by id in memory to avoid flicker (basic memo across calls)
-			return arr.sort((a,b)=> (a.priority===b.priority? (a.createdAt - b.createdAt) : (b.priority > a.priority ? 1 : -1)));
+			return arr.sort((a, b) => (Number(b.priority - a.priority) || (a.createdAt - b.createdAt)));
 		},
 			enabled: !!GOV_ADDR && items > 0,
 		refetchOnWindowFocus: false,
 		refetchOnReconnect: false,
 		staleTime: 30_000,
 		gcTime: 300_000,
-		keepPreviousData: true,
+		placeholderData: (prev) => (Array.isArray(prev) ? prev : [] as any[]),
 	});
 
 	// Stats
@@ -242,10 +243,10 @@ export default function Home() {
 		args: [],
 	});
 
-	const votes = votesBn ? BigInt(votesBn as any) : 0n;
+	const votes = votesBn ? BigInt(votesBn as any) : BigInt(0);
 	const decs = decsBn != null ? Number(decsBn) : 18;
 	const votesDisplay = formatUnits(votes, 18);
-	const donatedExact = donatedBn ? BigInt(donatedBn as any) : 0n;
+	const donatedExact = donatedBn ? BigInt(donatedBn as any) : BigInt(0);
 	const donatedDisplay = formatUnits(donatedExact, decs);
 	const last = lastBump ? Number(lastBump) : 0;
 	const cd = cooldown ? Number(cooldown) : 0;

@@ -14,48 +14,14 @@ from eth_account.signers.local import LocalAccount
 
 from crypto_utils import (
     decrypt_envelope_or_oaep,
+    derive_rsa_keypair_from_mnemonic,
 )
-from Crypto.Protocol.KDF import HKDF
-from Crypto.Hash import SHA256
-from Crypto.PublicKey import RSA
 import urllib.request
 import urllib.parse
 import shutil
 
 from agent import AnalysisAgent
 
-class DeterministicHMACDRBG:
-    """Deterministic byte stream generator (HMAC-DRBG-like) for RSA generation from a seed.
-    This is NOT a standards-compliant DRBG; it is sufficient to deterministically derive RSA keys
-    from a stable mnemonic seed within this application context.
-    """
-
-    def __init__(self, seed: bytes):
-        self._key = seed
-        self._counter = 0
-
-    def read(self, nbytes: int) -> bytes:
-        out = bytearray()
-        while len(out) < nbytes:
-            msg = self._counter.to_bytes(8, "big") + b"/drbg"
-            digest = SHA256.new(self._key + msg).digest()
-            out.extend(digest)
-            self._counter += 1
-        return bytes(out[:nbytes])
-
-
-def derive_rsa_keypair_from_mnemonic(mnemonic: str, bits: int = 2048) -> Tuple[str, str]:
-    """Derive a deterministic RSA keypair (PEM strings) from a mnemonic using HKDF -> DRBG.
-    Returns (private_pem, public_pem).
-    """
-    salt = b"cellvoyager-rsa-salt"
-    info = b"cellvoyager-rsa-info"
-    seed = HKDF(master=mnemonic.encode("utf-8"), key_len=32, salt=salt, hashmod=SHA256, context=info)
-    drbg = DeterministicHMACDRBG(seed)
-    key = RSA.generate(bits, randfunc=drbg.read)
-    priv_pem = key.export_key(format="PEM").decode("utf-8")
-    pub_pem = key.publickey().export_key(format="PEM").decode("utf-8")
-    return priv_pem, pub_pem
 
 def load_contract_abi(abi_path: Optional[str]) -> List[Dict[str, Any]]:
     """Load ABI from Foundry artifact JSON. Fail if it cannot be loaded.
@@ -210,27 +176,45 @@ def process_research_queue(
         return
 
     items = []
-    for i in range(count):
-        r = contract.functions.getResearch(i).call()
-        # Expected tuple layout (per frontend ABI):
-        # 0 analysisName, 1 description, 2 encryptedH5adPath, 3 modelName,
-        # 4 numAnalyses, 5 maxIterations, 6 submitter, 7 createdAt,
-        # 8 completed, 9 completedAt, 10 priority, 11 totalVotes
-        item = {
-            "analysisName": r[0],
-            "description": r[1],
-            "encryptedH5adPath": r[2],
-            "modelName": r[3],
-            "numAnalyses": int(r[4]),
-            "maxIterations": int(r[5]),
-            "submitter": r[6],
-            "createdAt": int(r[7]),
-            "completed": bool(r[8]),
-            "completedAt": int(r[9]),
-            "priority": int(r[10]),
-            "totalVotes": int(r[11]),
-        }
-        items.append((i, item))
+    page_size = max(1, int(os.getenv("RESEARCH_PAGE_SIZE", "50")))
+    offset = 0
+    while offset < count:
+        limit = min(page_size, count - offset)
+        try:
+            batch = contract.functions.getResearchRange(offset, limit).call()
+        except Exception:
+            # Fallback to per-item calls for this window if range call is unavailable
+            batch = []
+            for j in range(offset, offset + limit):
+                try:
+                    batch.append(contract.functions.getResearch(j).call())
+                except Exception:
+                    batch.append(None)
+
+        for idx_in_page, r in enumerate(batch):
+            if not r:
+                continue
+            i = offset + idx_in_page
+            # Expected tuple layout (per frontend ABI):
+            # 0 analysisName, 1 description, 2 encryptedH5adPath, 3 modelName,
+            # 4 numAnalyses, 5 maxIterations, 6 submitter, 7 createdAt,
+            # 8 completed, 9 completedAt, 10 priority, 11 totalVotes
+            item = {
+                "analysisName": r[0],
+                "description": r[1],
+                "encryptedH5adPath": r[2],
+                "modelName": r[3],
+                "numAnalyses": int(r[4]),
+                "maxIterations": int(r[5]),
+                "submitter": r[6],
+                "createdAt": int(r[7]),
+                "completed": bool(r[8]),
+                "completedAt": int(r[9]),
+                "priority": int(r[10]),
+                "totalVotes": int(r[11]),
+            }
+            items.append((i, item))
+        offset += limit
 
     # Sort by current priority desc, then earliest created
     items.sort(key=lambda x: (-x[1]["priority"], x[1]["createdAt"]))
@@ -250,7 +234,7 @@ def process_research_queue(
         break
 
     if chosen is None:
-        print("No processable research found this cycle (decryption or files missing).")
+        print("No processable research found this cycle")
         return
 
     research_id, meta = chosen
@@ -292,17 +276,40 @@ def process_research_queue(
 
     # Mark this research as completed on-chain (best-effort)
     try:
+        # Preflight: simulate to catch NotAgent/InvalidResearch early
+        try:
+            contract.functions.markCompleted(research_id).call({
+                "from": acct.address,
+            })
+        except Exception as sim_err:
+            print(f"  ❌ Preflight markCompleted failed: {sim_err}")
+            return
+
+        # Estimate gas with padding
+        try:
+            estimated_gas = contract.functions.markCompleted(research_id).estimate_gas({
+                "from": acct.address,
+            })
+        except Exception:
+            estimated_gas = 120_000
+        gas_limit = min(500_000, int(estimated_gas * 2) + 50_000)
+
         tx = contract.functions.markCompleted(research_id).build_transaction({
             "from": acct.address,
             "nonce": w3.eth.get_transaction_count(acct.address),
-            "gas": 200_000,
+            "gas": gas_limit,
             "maxFeePerGas": w3.to_wei(os.getenv("MAX_FEE_GWEI", "30"), "gwei"),
             "maxPriorityFeePerGas": w3.to_wei(os.getenv("MAX_PRIORITY_FEE_GWEI", "2"), "gwei"),
             "chainId": w3.eth.chain_id,
         })
         signed = acct.sign_transaction(tx)
         tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
-        w3.eth.wait_for_transaction_receipt(tx_hash)
+        print(f"  📝 markCompleted tx sent: {tx_hash.hex()}")
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+        if receipt.status == 1:
+            print("  ✅ markCompleted confirmed")
+        else:
+            print(f"  ⚠️ markCompleted failed with status {receipt.status}")
     except Exception as e:
         print(f"⚠️ Failed to mark completed on-chain: {e}")
 
@@ -361,6 +368,16 @@ def main() -> int:
     abi = load_contract_abi(args.abi_path if args.abi_path else None)
     contract = w3.eth.contract(address=Web3.to_checksum_address(args.gov_address), abi=abi)
 
+    # Sanity-check agent binding to avoid silent NotAgent reverts
+    try:
+        onchain_agent = Web3.to_checksum_address(contract.functions.agent().call())
+        if onchain_agent != Web3.to_checksum_address(acct.address):
+            print(f"❌ Agent mismatch: contract agent {onchain_agent} != local {acct.address}")
+            return 1
+    except Exception:
+        # If the method doesn't exist (unexpected), continue
+        pass
+
     def tick_once() -> bool:
         try:
             ensure_public_key_onchain(w3, acct, contract, public_pem, chain_id=(args.chain_id or None))
@@ -395,5 +412,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
-

@@ -22,7 +22,7 @@ contract DeployAll is Script {
 
         // GovernanceQueue with distinct agent address
         require(agent != address(0), "Invalid AGENT env (must be non-zero and != admin)");
-        GovernanceQueue gq = new GovernanceQueue(admin, agent, sbt, pubKey);
+        GovernanceQueue gq = new GovernanceQueue(agent, sbt, pubKey);
         console2.log("GovernanceQueue:", address(gq));
 
         // Deploy mock token and mint 100k to admin

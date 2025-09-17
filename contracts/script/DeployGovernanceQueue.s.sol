@@ -8,12 +8,11 @@ import {DonationSBT} from "../src/DonationSBT.sol";
 
 contract DeployGovernanceQueue is Script {
     function run() external {
-        address admin = vm.envOr("ADMIN", address(0));
         address agent = vm.envAddress("AGENT");
         address sbtAddr = vm.envAddress("SBT");
         string memory pubKey = vm.envString("PUBLIC_KEY");
         vm.startBroadcast();
-        GovernanceQueue gq = new GovernanceQueue(admin, agent, DonationSBT(sbtAddr), pubKey);
+        GovernanceQueue gq = new GovernanceQueue(agent, DonationSBT(sbtAddr), pubKey);
         vm.stopBroadcast();
         console2.log("GovernanceQueue deployed at", address(gq));
     }

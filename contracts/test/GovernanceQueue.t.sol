@@ -43,18 +43,19 @@ contract GovernanceQueueTest is Test {
     GovernanceQueue gq;
     MockERC20 token;
 
-    address admin = address(0xA11CE);
+    address ownerAddr = address(0xA11CE);
+    address agentAddr = address(0xA93E7);
     address user1 = address(0xBEEF);
     address user2 = address(0xCAFE);
 
     function setUp() public {
-        vm.startPrank(admin);
-        sbt = new DonationSBT(admin);
-        gq = new GovernanceQueue(admin, admin, sbt, "PUB_KEY");
+        vm.startPrank(ownerAddr);
+        sbt = new DonationSBT(ownerAddr);
+        gq = new GovernanceQueue(agentAddr, sbt, "PUB_KEY");
         vm.stopPrank();
 
         token = new MockERC20();
-        vm.prank(admin);
+        vm.prank(ownerAddr);
         sbt.setWhitelist(address(token), true, 1e18);
 
         token.mint(user1, 100 ether);
@@ -71,12 +72,12 @@ contract GovernanceQueueTest is Test {
     }
 
     function testOwnerOrAuthorizedCanAdd() public {
-        vm.prank(admin);
+        vm.prank(ownerAddr);
         uint256 id = gq.addResearch("A", "desc", "enc", "o3-mini", 8, 6);
         assertEq(id, 0);
 
         address auth = address(0x1234);
-        vm.prank(admin);
+        vm.prank(agentAddr);
         gq.setAuthorized(auth, true);
 
         vm.prank(auth);
@@ -85,7 +86,7 @@ contract GovernanceQueueTest is Test {
     }
 
     function testBumpPriorityRespectsCooldownAndWeight() public {
-        vm.prank(admin);
+        vm.prank(ownerAddr);
         uint256 id = gq.addResearch("A", "desc", "enc", "o3-mini", 8, 6);
 
         // user1 votes (100), then user2 votes (50)
@@ -116,9 +117,59 @@ contract GovernanceQueueTest is Test {
     }
 
     function testUpdatePublicKey() public {
-        vm.prank(admin);
+        // Owner is not agent; should revert
+        vm.prank(ownerAddr);
+        vm.expectRevert(GovernanceQueue.NotAgent.selector);
+        gq.setPublicEncryptionKey("BAD");
+
+        // Agent can update
+        vm.prank(agentAddr);
         gq.setPublicEncryptionKey("NEW_KEY");
         assertEq(gq.publicEncryptionKey(), "NEW_KEY");
+    }
+
+    function testOnlyAgentGuards() public {
+        address auth = address(0x9999);
+        // Owner cannot set authorized
+        vm.prank(ownerAddr);
+        vm.expectRevert(GovernanceQueue.NotAgent.selector);
+        gq.setAuthorized(auth, true);
+
+        // Random user cannot set authorized
+        vm.prank(user1);
+        vm.expectRevert(GovernanceQueue.NotAgent.selector);
+        gq.setAuthorized(auth, true);
+
+        // Agent can set authorized
+        vm.prank(agentAddr);
+        gq.setAuthorized(auth, true);
+        // Now authorized can add
+        vm.prank(auth);
+        uint256 id = gq.addResearch("C", "desc", "enc", "o3-mini", 1, 1);
+        assertEq(id, 0);
+    }
+
+    function testMarkCompletedOnlyAgent() public {
+        // Owner adds research
+        vm.prank(ownerAddr);
+        uint256 id = gq.addResearch("A", "desc", "enc", "o3-mini", 8, 6);
+
+        // Owner cannot mark completed
+        vm.prank(ownerAddr);
+        vm.expectRevert(GovernanceQueue.NotAgent.selector);
+        gq.markCompleted(id);
+
+        // Random user cannot mark completed
+        vm.prank(user1);
+        vm.expectRevert(GovernanceQueue.NotAgent.selector);
+        gq.markCompleted(id);
+
+        // Agent marks completed
+        vm.prank(agentAddr);
+        gq.markCompleted(id);
+        GovernanceQueue.Research memory r = gq.getResearch(id);
+        assertTrue(r.completed);
+        assertGt(r.completedAt, 0);
     }
 }
 

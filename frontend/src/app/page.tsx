@@ -12,78 +12,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { parseUnits, formatUnits } from "viem";
 import { encryptUrlEnvelope } from "@/lib/crypto";
+import governanceAbi from "@/abi/GovernanceQueue.json";
+import donationAbi from "@/abi/DonationSBT.json";
 
-const governanceAbi = [
-	{
-		type: "function",
-		name: "addResearch",
-		stateMutability: "nonpayable",
-		inputs: [
-			{ name: "analysisName", type: "string" },
-			{ name: "description", type: "string" },
-			{ name: "encryptedH5adPath", type: "string" },
-			{ name: "modelName", type: "string" },
-			{ name: "numAnalyses", type: "uint32" },
-			{ name: "maxIterations", type: "uint32" },
-		],
-		outputs: [{ name: "id", type: "uint256" }],
-	},
-	{ type: "function", name: "researchCount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
-	{
-		type: "function",
-		name: "getResearch",
-		stateMutability: "view",
-		inputs: [{ name: "id", type: "uint256" }],
-		outputs: [
-			{
-				type: "tuple",
-				components: [
-					{ name: "analysisName", type: "string" },
-					{ name: "description", type: "string" },
-					{ name: "encryptedH5adPath", type: "string" },
-					{ name: "modelName", type: "string" },
-					{ name: "numAnalyses", type: "uint32" },
-					{ name: "maxIterations", type: "uint32" },
-					{ name: "submitter", type: "address" },
-					{ name: "createdAt", type: "uint64" },
-					{ name: "completed", type: "bool" },
-					{ name: "completedAt", type: "uint64" },
-					{ name: "priority", type: "uint256" },
-					{ name: "totalVotes", type: "uint256" },
-				],
-			},
-		],
-	},
-	{ type: "function", name: "bumpPriority", stateMutability: "nonpayable", inputs: [{ name: "id", type: "uint256" }], outputs: [] },
-	{
-		type: "function",
-		name: "getResearchRange",
-		stateMutability: "view",
-		inputs: [ { name: "offset", type: "uint256" }, { name: "limit", type: "uint256" } ],
-		outputs: [
-			{
-				type: "tuple[]",
-				components: [
-					{ name: "analysisName", type: "string" },
-					{ name: "description", type: "string" },
-					{ name: "encryptedH5adPath", type: "string" },
-					{ name: "modelName", type: "string" },
-					{ name: "numAnalyses", type: "uint32" },
-					{ name: "maxIterations", type: "uint32" },
-					{ name: "submitter", type: "address" },
-					{ name: "createdAt", type: "uint64" },
-					{ name: "completed", type: "bool" },
-					{ name: "completedAt", type: "uint64" },
-					{ name: "priority", type: "uint256" },
-					{ name: "totalVotes", type: "uint256" },
-				],
-			},
-		],
-	},
-	{ type: "function", name: "publicEncryptionKey", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
-	{ type: "function", name: "lastBumpAt", stateMutability: "view", inputs: [{ name: "addr", type: "address" }], outputs: [{ type: "uint64" }] },
-	{ type: "function", name: "COOLDOWN_SECONDS", stateMutability: "view", inputs: [], outputs: [{ type: "uint64" }] },
-];
 
 const erc20Abi = [
 	{ type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{ name: "spender", type: "address" }, { name: "value", type: "uint256" }], outputs: [{ type: "bool" }] },
@@ -92,15 +23,6 @@ const erc20Abi = [
 	{ type: "function", name: "decimals", stateMutability: "view", inputs: [], outputs: [{ type: "uint8" }] },
 ];
 
-const donationAbi = [
-	{ type: "function", name: "setWhitelist", stateMutability: "nonpayable", inputs: [{ name: "token", type: "address" }, { name: "allowed", type: "bool" }, { name: "rate", type: "uint256" }], outputs: [] },
-	{ type: "function", name: "donate", stateMutability: "nonpayable", inputs: [{ name: "token", type: "address" }, { name: "amount", type: "uint256" }], outputs: [] },
-	{ type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "account", type: "address" }], outputs: [{ type: "uint256" }] },
-	{ type: "function", name: "voteRatePerToken", stateMutability: "view", inputs: [{ name: "token", type: "address" }], outputs: [{ type: "uint256" }] },
-	{ type: "function", name: "isWhitelisted", stateMutability: "view", inputs: [{ name: "token", type: "address" }], outputs: [{ type: "bool" }] },
-	{ type: "function", name: "donatedAmount", stateMutability: "view", inputs: [{ name: "user", type: "address" }, { name: "token", type: "address" }], outputs: [{ type: "uint256" }] },
-	{ type: "function", name: "votesFromToken", stateMutability: "view", inputs: [{ name: "user", type: "address" }, { name: "token", type: "address" }], outputs: [{ type: "uint256" }] },
-];
 
 const GOV_ADDR = (process.env.NEXT_PUBLIC_GOV_ADDRESS || process.env.GOV_ADDRESS) as `0x${string}` | undefined;
 const SBT_ADDR = (process.env.NEXT_PUBLIC_SBT_ADDRESS || process.env.SBT_ADDRESS) as `0x${string}` | undefined;

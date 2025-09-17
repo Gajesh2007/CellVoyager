@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useMemo } from "react";
 import { useAccount, useChainId, useWriteContract, useReadContract, usePublicClient, useBlockNumber } from "wagmi";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Skeleton } from "@/components/ui/skeleton";
 import { parseUnits, formatUnits } from "viem";
 import { encryptUrlEnvelope } from "@/lib/crypto";
 
@@ -180,7 +181,7 @@ export default function Home() {
 	  });
   const items = useMemo(() => Number(count || 0), [count]);
 
-	const { data: queue } = useQuery({
+	const { data: queue, isLoading: queueLoading } = useQuery({
 		queryKey: ["queue", items, GOV_ADDR, block?.toString?.()],
 		queryFn: async () => {
 			if (!GOV_ADDR || !publicClient) return [] as any[];
@@ -198,7 +199,7 @@ export default function Home() {
 			// Cache by id in memory to avoid flicker (basic memo across calls)
 			return arr.sort((a,b)=> (a.priority===b.priority? (a.createdAt - b.createdAt) : (b.priority > a.priority ? 1 : -1)));
 		},
-		enabled: !!GOV_ADDR && items > 0,
+			enabled: !!GOV_ADDR && items > 0,
 		refetchOnWindowFocus: false,
 		refetchOnReconnect: false,
 		staleTime: 30_000,
@@ -342,24 +343,51 @@ export default function Home() {
 							</div>
 							<div className="space-y-2">
 								<h3 className="font-medium">Queue</h3>
-								<div className="grid gap-2">
-									{queue?.map((q: any) => (
-										<Card key={q.id}>
-											<CardHeader>
-												<CardTitle className="text-base flex items-center justify-between">
-													<span>{q.analysisName}</span>
-													<Button size="sm" onClick={() => vote(q.id)} disabled={!isConnected}>Vote</Button>
-												</CardTitle>
-											</CardHeader>
-											<CardContent>
-												<div className="text-sm text-muted-foreground">{q.description}</div>
-												<div className="text-xs mt-2">Model: {q.modelName}</div>
-												<div className="text-xs">Priority: {q.priority?.toString?.() ?? String(q.priority)}</div>
-											</CardContent>
-										</Card>
-									))}
-								</div>
-        </div>
+								{queueLoading ? (
+									<div className="grid gap-2">
+										<Skeleton className="h-24 w-full" />
+										<Skeleton className="h-24 w-full" />
+									</div>
+								) : (
+									<>
+										<div className="grid gap-2">
+											{queue?.filter((q: any) => !q.completed).map((q: any) => (
+												<Card key={q.id}>
+													<CardHeader>
+														<CardTitle className="text-base flex items-center justify-between">
+															<span>{q.analysisName}</span>
+															<Button size="sm" onClick={() => vote(q.id)} disabled={!isConnected}>Vote</Button>
+														</CardTitle>
+													</CardHeader>
+													<CardContent>
+														<div className="text-sm text-muted-foreground">{q.description}</div>
+														<div className="text-xs mt-2">Model: {q.modelName}</div>
+														<div className="text-xs">Priority: {q.priority?.toString?.() ?? String(q.priority)}</div>
+													</CardContent>
+												</Card>
+											))}
+										</div>
+										<div className="space-y-2 mt-6">
+											<h4 className="font-medium">Completed</h4>
+											<div className="grid gap-2">
+												{queue?.filter((q: any) => q.completed).map((q: any) => (
+													<Card key={q.id} className="opacity-60">
+														<CardHeader>
+															<CardTitle className="text-base flex items-center justify-between">
+																<span>{q.analysisName}</span>
+															</CardTitle>
+														</CardHeader>
+														<CardContent>
+															<div className="text-sm text-muted-foreground">{q.description}</div>
+															<div className="text-xs mt-2">Model: {q.modelName}</div>
+														</CardContent>
+													</Card>
+												))}
+											</div>
+										</div>
+									</>
+								)}
+							</div>
 						</CardContent>
 					</Card>
 				</TabsContent>

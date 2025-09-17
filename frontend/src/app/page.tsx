@@ -172,7 +172,12 @@ export default function Home() {
       const res = await publicClient.readContract({ address: GOV_ADDR, abi: governanceAbi as any, functionName: "researchCount", args: [] });
       return Number(res || 0);
     },
-  });
+	    refetchOnWindowFocus: false,
+	    refetchOnReconnect: false,
+	    staleTime: 30_000,
+	    gcTime: 300_000,
+	    keepPreviousData: true,
+	  });
   const items = useMemo(() => Number(count || 0), [count]);
 
 	const { data: queue } = useQuery({
@@ -181,16 +186,24 @@ export default function Home() {
 			if (!GOV_ADDR || !publicClient) return [] as any[];
 			if (!items) return [] as any[];
 			const range: any = await publicClient.readContract({ address: GOV_ADDR, abi: governanceAbi as any, functionName: "getResearchRange", args: [0n, BigInt(items)] });
-			return (range as any[]).map((r: any, i: number) => {
+			const arr = (range as any[]).map((r: any, i: number) => {
 				const analysisName = r?.analysisName ?? r?.[0] ?? "";
 				const description = r?.description ?? r?.[1] ?? "";
 				const modelName = r?.modelName ?? r?.[3] ?? "";
 				const createdAt = Number(r?.createdAt ?? r?.[7] ?? 0);
 				const priority = BigInt((r?.priority ?? r?.[8] ?? 0).toString());
-				return { id: i, analysisName, description, modelName, priority, createdAt };
-			}).sort((a,b)=> (a.priority===b.priority? (a.createdAt - b.createdAt) : (b.priority > a.priority ? 1 : -1)));
+				const completed = Boolean(r?.completed ?? r?.[10] ?? false);
+				return { id: i, analysisName, description, modelName, priority, createdAt, completed };
+			});
+			// Cache by id in memory to avoid flicker (basic memo across calls)
+			return arr.sort((a,b)=> (a.priority===b.priority? (a.createdAt - b.createdAt) : (b.priority > a.priority ? 1 : -1)));
 		},
 		enabled: !!GOV_ADDR && items > 0,
+		refetchOnWindowFocus: false,
+		refetchOnReconnect: false,
+		staleTime: 30_000,
+		gcTime: 300_000,
+		keepPreviousData: true,
 	});
 
 	// Stats

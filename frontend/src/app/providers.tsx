@@ -9,7 +9,23 @@ import { getDefaultConfig, RainbowKitProvider, darkTheme } from "@rainbow-me/rai
 import "@rainbow-me/rainbowkit/styles.css";
 
 export default function Providers({ children }: PropsWithChildren) {
-  const queryClient = useMemo(() => new QueryClient(), []);
+  const queryClient = useMemo(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            refetchOnWindowFocus: false,
+            refetchOnReconnect: false,
+            retry: 1,
+            staleTime: 30_000,
+            gcTime: 300_000,
+            refetchInterval: false,
+            keepPreviousData: true,
+          },
+        },
+      }),
+    []
+  );
   const config = useMemo(
     () =>
       getDefaultConfig({

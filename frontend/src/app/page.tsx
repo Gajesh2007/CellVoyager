@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useState, useMemo } from "react";
-import { useAccount, useChainId, useWriteContract, useReadContract, usePublicClient, useBlockNumber } from "wagmi";
+import { useAccount, useWriteContract, useReadContract, usePublicClient } from "wagmi";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { parseUnits, formatUnits } from "viem";
@@ -46,6 +46,8 @@ const governanceAbi = [
 					{ name: "maxIterations", type: "uint32" },
 					{ name: "submitter", type: "address" },
 					{ name: "createdAt", type: "uint64" },
+					{ name: "completed", type: "bool" },
+					{ name: "completedAt", type: "uint64" },
 					{ name: "priority", type: "uint256" },
 					{ name: "totalVotes", type: "uint256" },
 				],
@@ -70,6 +72,8 @@ const governanceAbi = [
 					{ name: "maxIterations", type: "uint32" },
 					{ name: "submitter", type: "address" },
 					{ name: "createdAt", type: "uint64" },
+					{ name: "completed", type: "bool" },
+					{ name: "completedAt", type: "uint64" },
 					{ name: "priority", type: "uint256" },
 					{ name: "totalVotes", type: "uint256" },
 				],
@@ -108,7 +112,6 @@ export default function Home() {
 	const { isConnected, address } = useAccount();
 	const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
-  const { data: block } = useBlockNumber({ watch: true });
   const queryClient = useQueryClient();
 
 	const [form, setForm] = useState({
@@ -167,7 +170,7 @@ export default function Home() {
 	}
 
 	const { data: count } = useQuery({
-    queryKey: ["count", GOV_ADDR, block?.toString?.()],
+    queryKey: ["count", GOV_ADDR],
     queryFn: async () => {
       if (!GOV_ADDR || !publicClient) return 0;
       const res = await publicClient.readContract({ address: GOV_ADDR, abi: governanceAbi as any, functionName: "researchCount", args: [] });
@@ -182,7 +185,7 @@ export default function Home() {
   const items = useMemo(() => Number(count || 0), [count]);
 
 	const { data: queue, isLoading: queueLoading } = useQuery({
-		queryKey: ["queue", items, GOV_ADDR, block?.toString?.()],
+		queryKey: ["queue", items, GOV_ADDR],
 		queryFn: async () => {
 			if (!GOV_ADDR || !publicClient) return [] as any[];
 			if (!items) return [] as any[];
@@ -192,8 +195,8 @@ export default function Home() {
 				const description = r?.description ?? r?.[1] ?? "";
 				const modelName = r?.modelName ?? r?.[3] ?? "";
 				const createdAt = Number(r?.createdAt ?? r?.[7] ?? 0);
-				const priority = BigInt((r?.priority ?? r?.[8] ?? 0).toString());
-				const completed = Boolean(r?.completed ?? r?.[10] ?? false);
+				const priority = BigInt((r?.priority ?? r?.[10] ?? 0).toString());
+				const completed = Boolean(r?.completed ?? r?.[8] ?? false);
 				return { id: i, analysisName, description, modelName, priority, createdAt, completed };
 			});
 			// Cache by id in memory to avoid flicker (basic memo across calls)
@@ -362,7 +365,7 @@ export default function Home() {
 													<CardContent>
 														<div className="text-sm text-muted-foreground">{q.description}</div>
 														<div className="text-xs mt-2">Model: {q.modelName}</div>
-														<div className="text-xs">Priority: {q.priority?.toString?.() ?? String(q.priority)}</div>
+														<div className="text-xs">Governance Votes: {formatUnits(q.priority, 18)}</div>
 													</CardContent>
 												</Card>
 											))}

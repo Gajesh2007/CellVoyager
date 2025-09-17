@@ -265,7 +265,7 @@ class AnalysisAgent:
         # Keep only the most recent cells up to code_memory_size
         self.code_memory = code_cells[-self.code_memory_size:] if len(code_cells) > 0 else []
         
-    def generate_next_step_analysis(self, analysis, attempted_analyses, notebook_cells, results_interpretation, num_steps_left):
+    def generate_next_step_analysis(self, analysis, attempted_analyses, notebook_cells, results_interpretation, num_steps_left, seeded=False):
         hypothesis = analysis["hypothesis"]
         analysis_plan = analysis["analysis_plan"]
         first_step_code = analysis["first_step_code"]

@@ -5,11 +5,12 @@ import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
-/// @title DonationSBT - Soulbound voting receipt for donations
+/// @title DonationSBT - Soulbound ERC20 voting receipt for donations
 /// @notice Users donate whitelisted ERC20 tokens and receive non-transferable voting units based on token-specific rates.
-/// @dev Not an ERC20. Tracks balances internally and forbids transfers. Supports owner-managed whitelist and rates.
-contract DonationSBT is Ownable, ReentrancyGuard {
+/// @dev Inherits OpenZeppelin ERC20, but blocks transfers/approvals to behave as soulbound. Owner manages whitelist and rates.
+contract DonationSBT is ERC20, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     error NotWhitelisted(address token);
@@ -24,17 +25,16 @@ contract DonationSBT is Ownable, ReentrancyGuard {
     // token -> votes per 1 token unit (fixed-point 1e18 scale for precision)
     mapping(address => uint256) public voteRatePerToken;
 
-    // user -> votes (1e18 precision)
-    mapping(address => uint256) private _balance;
-    uint256 private _totalSupply;
-
     // user => token => total donated token amount (raw token units)
     mapping(address => mapping(address => uint256)) public donatedAmount;
 
     // user => token => votes minted from that token (1e18 precision)
     mapping(address => mapping(address => uint256)) public votesFromToken;
 
-    constructor(address initialOwner) Ownable(initialOwner == address(0) ? msg.sender : initialOwner) {}
+    constructor(address initialOwner)
+        ERC20("DonationSBT", "SBT")
+        Ownable(initialOwner == address(0) ? msg.sender : initialOwner)
+    {}
 
     /// @notice Set or update a token whitelist status and vote rate.
     /// @param token ERC20 token address
@@ -68,18 +68,17 @@ contract DonationSBT is Ownable, ReentrancyGuard {
         emit Donated(msg.sender, token, amount, votes);
     }
 
-    /// @notice View functions
-    function balanceOf(address account) external view returns (uint256) { return _balance[account]; }
-    function totalSupply() external view returns (uint256) { return _totalSupply; }
-
     /// @notice Transfer is disabled to keep votes soulbound
-    function transfer(address, uint256) external pure returns (bool) { revert TransferDisabled(); }
-    function approve(address, uint256) external pure returns (bool) { revert TransferDisabled(); }
-    function transferFrom(address, address, uint256) external pure returns (bool) { revert TransferDisabled(); }
+    function transfer(address, uint256) public override returns (bool) { revert TransferDisabled(); }
+    function approve(address, uint256) public override returns (bool) { revert TransferDisabled(); }
+    function transferFrom(address, address, uint256) public override returns (bool) { revert TransferDisabled(); }
 
-    function _mint(address to, uint256 amount) internal {
-        _totalSupply += amount;
-        _balance[to] += amount;
+    /// @dev Block any attempt to move tokens between non-zero addresses. Allow mints/burns.
+    function _update(address from, address to, uint256 value) internal virtual override {
+        if (from != address(0) && to != address(0)) {
+            revert TransferDisabled();
+        }
+        super._update(from, to, value);
     }
 }
 

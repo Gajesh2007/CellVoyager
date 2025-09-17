@@ -78,20 +78,9 @@ where:
 * `paper-path` is the absolute path of a `.txt` file containing the LLM or human generated summary of the paper
 * `analysis-name` is the name you want your analysis files to be saved under
 
-### Sovereign Verifiable Agent
-To run the sovereign verifiable agent that processes research requests from the blockchain:
-```bash
-python run_onchain.py --watch
-```
+## Sovereign Verifiable Agent
 
-This will:
-1. Connect to the blockchain using your `RPC_URL` and `MNEMONIC`
-2. Poll the GovernanceQueue contract for new research requests
-3. Download encrypted datasets, decrypt them using your RSA private key
-4. Run analysis using the CellVoyager agent
-5. Mark completed research on-chain
-
-## Smart Contract Deployment
+### Smart Contract Deployment
 
 ### Prerequisites
 Install Foundry:
@@ -124,7 +113,26 @@ SBT=0x... forge script script/DeployGovernanceQueue.s.sol --rpc-url $RPC_URL --p
 
 After deployment, update your root `.env` and `frontend/.env` files with the deployed contract addresses.
 
-## Frontend Setup
+### Running the Sovereign Verifiable Agent
+
+Prerequisites:
+* Must have a [Rabby wallet](https://chromewebstore.google.com/detail/rabby-wallet/acmacodkjbdgmoleebolmdjonilkdbch?hl=en&pli=1)
+* Select `https://base-sepolia.drpc.org`, click on `Connect Wallet` next to it and add RPC to Rabby
+* Get Base Sepolia ETH from [here](https://www.alchemy.com/faucets/base-sepolia)
+
+To run the sovereign verifiable agent that processes research requests from the blockchain:
+```bash
+python run_onchain.py --watch
+```
+
+This will:
+1. Connect to the blockchain using your `RPC_URL`, `MNEMONIC` and `GOV_ADDRESS` 
+2. Poll the GovernanceQueue contract for new research requests
+3. Download encrypted datasets, decrypt them using your RSA private key
+4. Run analysis using the CellVoyager agent
+5. Mark completed research on-chain
+
+### Frontend Setup
 
 The frontend is a Next.js application that provides a web interface for submitting research requests and managing the governance queue.
 

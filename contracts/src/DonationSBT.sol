@@ -28,6 +28,12 @@ contract DonationSBT is Ownable, ReentrancyGuard {
     mapping(address => uint256) private _balance;
     uint256 private _totalSupply;
 
+    // user => token => total donated token amount (raw token units)
+    mapping(address => mapping(address => uint256)) public donatedAmount;
+
+    // user => token => votes minted from that token (1e18 precision)
+    mapping(address => mapping(address => uint256)) public votesFromToken;
+
     constructor(address initialOwner) Ownable(initialOwner == address(0) ? msg.sender : initialOwner) {}
 
     /// @notice Set or update a token whitelist status and vote rate.
@@ -53,6 +59,10 @@ contract DonationSBT is Ownable, ReentrancyGuard {
 
         // Compute votes = amount * rate / 1e18
         uint256 votes = (amount * voteRatePerToken[token]) / 1e18;
+
+        // Track per-token totals for view functions/analytics
+        donatedAmount[msg.sender][token] += amount;
+        votesFromToken[msg.sender][token] += votes;
 
         _mint(msg.sender, votes);
         emit Donated(msg.sender, token, amount, votes);

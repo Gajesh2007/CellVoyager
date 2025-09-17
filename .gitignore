@@ -12,3 +12,6 @@ logs/
 
 # Large example data
 example/*.h5ad
+
+keys/
+downloads/

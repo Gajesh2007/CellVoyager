@@ -134,6 +134,22 @@ contract GovernanceQueue is Ownable, ReentrancyGuard {
     function researchCount() external view returns (uint256) {
         return _researches.length;
     }
+
+    /// @notice Returns a slice of the research queue [offset, offset+limit)
+    /// @dev Safe for off-chain calls; avoid large limits to prevent excessive response size
+    function getResearchRange(uint256 offset, uint256 limit) external view returns (Research[] memory result) {
+        uint256 len = _researches.length;
+        if (offset >= len) {
+            return new Research[](0);
+        }
+        uint256 end = offset + limit;
+        if (end > len) end = len;
+        uint256 n = end - offset;
+        result = new Research[](n);
+        for (uint256 i = 0; i < n; i++) {
+            result[i] = _researches[offset + i];
+        }
+    }
 }
 
 

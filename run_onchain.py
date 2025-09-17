@@ -14,7 +14,7 @@ from eth_account.signers.local import LocalAccount
 
 from crypto_utils import (
     derive_rsa_keypair_from_mnemonic,
-    decrypt_base64_oaep,
+    decrypt_envelope_or_oaep,
 )
 import urllib.request
 import urllib.parse
@@ -235,7 +235,7 @@ def process_research_queue(
     # Find the first processable item (decryptable URL)
     chosen: Optional[Tuple[int, dict]] = None
     for research_id, meta in items:
-        decrypted = decrypt_base64_oaep(meta["encryptedH5adPath"], private_pem)
+        decrypted = decrypt_envelope_or_oaep(meta["encryptedH5adPath"], private_pem)
         if not decrypted:
             continue
         paper_summary_path = os.getenv("PAPER_SUMMARY_PATH", default_paper_summary_path)
@@ -290,7 +290,7 @@ def main() -> int:
     load_dotenv()
 
     parser = argparse.ArgumentParser(description="On-chain agent runner for CellVoyager")
-    parser.add_argument("--gov-address", required=True, help="GovernanceQueue contract address")
+    parser.add_argument("--gov-address", default=os.getenv("GOV_ADDRESS") or os.getenv("NEXT_PUBLIC_GOV_ADDRESS", ""), help="GovernanceQueue contract address")
     parser.add_argument("--rpc-url", default=os.getenv("RPC_URL", ""), help="Ethereum RPC URL")
     parser.add_argument("--chain-id", type=int, default=0, help="Override chain ID (optional)")
     parser.add_argument("--prompt-dir", default="prompts", help="Prompt templates directory")
@@ -304,6 +304,10 @@ def main() -> int:
 
     if not args.rpc_url:
         print("❌ RPC URL is required (set --rpc-url or RPC_URL env)")
+        return 1
+
+    if not args.gov_address:
+        print("❌ GovernanceQueue address is required (set --gov-address or GOV_ADDRESS env)")
         return 1
 
     # Prepare OpenAI

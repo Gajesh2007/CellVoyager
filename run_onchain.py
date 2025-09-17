@@ -22,74 +22,8 @@ import shutil
 
 from agent import AnalysisAgent
 
-
-GOVERNANCE_QUEUE_ABI: List[Dict[str, Any]] = [
-    {
-        "inputs": [
-            {"internalType": "uint256", "name": "id", "type": "uint256"}
-        ],
-        "name": "getResearch",
-        "outputs": [
-            {
-                "components": [
-                    {"internalType": "string", "name": "analysisName", "type": "string"},
-                    {"internalType": "string", "name": "description", "type": "string"},
-                    {"internalType": "string", "name": "encryptedH5adPath", "type": "string"},
-                    {"internalType": "string", "name": "modelName", "type": "string"},
-                    {"internalType": "uint32", "name": "numAnalyses", "type": "uint32"},
-                    {"internalType": "uint32", "name": "maxIterations", "type": "uint32"},
-                    {"internalType": "address", "name": "submitter", "type": "address"},
-                    {"internalType": "uint64", "name": "createdAt", "type": "uint64"},
-                    {"internalType": "bool", "name": "completed", "type": "bool"},
-                    {"internalType": "uint64", "name": "completedAt", "type": "uint64"},
-                    {"internalType": "uint256", "name": "priority", "type": "uint256"},
-                    {"internalType": "uint256", "name": "totalVotes", "type": "uint256"}
-                ],
-                "internalType": "struct GovernanceQueue.Research",
-                "name": "",
-                "type": "tuple"
-            }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [
-            {"internalType": "uint256", "name": "id", "type": "uint256"}
-        ],
-        "name": "markCompleted",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [],
-        "name": "researchCount",
-        "outputs": [
-            {"internalType": "uint256", "name": "", "type": "uint256"}
-        ],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [],
-        "name": "publicEncryptionKey",
-        "outputs": [{"internalType": "string", "name": "", "type": "string"}],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [{"internalType": "string", "name": "newKey", "type": "string"}],
-        "name": "setPublicEncryptionKey",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    }
-]
-
-
 def load_contract_abi(abi_path: Optional[str]) -> List[Dict[str, Any]]:
-    """Load ABI from Foundry artifact (json contains 'abi' field). Fallback to built-in constant.
+    """Load ABI from Foundry artifact JSON. Fail if it cannot be loaded.
 
     If abi_path is provided, it will be used. Otherwise, defaults to
     ./contracts/out/GovernanceQueue.sol/GovernanceQueue.json relative to this file.
@@ -121,8 +55,10 @@ def load_contract_abi(abi_path: Optional[str]) -> List[Dict[str, Any]]:
     except Exception:
         pass
 
-    print("Warning: Could not load ABI from artifact, using built-in ABI constant.")
-    return GOVERNANCE_QUEUE_ABI
+    raise RuntimeError(
+        "Failed to load GovernanceQueue ABI. Provide --abi-path or ensure artifact exists at "
+        "contracts/out/GovernanceQueue.sol/GovernanceQueue.json"
+    )
 
 
 def _load_openai_api_key() -> Optional[str]:
@@ -228,6 +164,7 @@ def ensure_public_key_onchain(
 def process_research_queue(
     w3: Web3,
     contract,
+    acct: LocalAccount,
     private_pem: str,
     openai_api_key: str,
     default_paper_summary_path: str,
@@ -392,6 +329,7 @@ def main() -> int:
             process_research_queue(
                 w3=w3,
                 contract=contract,
+                acct=acct,
                 private_pem=private_pem,
                 openai_api_key=openai_api_key,
                 default_paper_summary_path=args.paper_summary,

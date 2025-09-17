@@ -40,6 +40,8 @@ GOVERNANCE_QUEUE_ABI: List[Dict[str, Any]] = [
                     {"internalType": "uint32", "name": "maxIterations", "type": "uint32"},
                     {"internalType": "address", "name": "submitter", "type": "address"},
                     {"internalType": "uint64", "name": "createdAt", "type": "uint64"},
+                    {"internalType": "bool", "name": "completed", "type": "bool"},
+                    {"internalType": "uint64", "name": "completedAt", "type": "uint64"},
                     {"internalType": "uint256", "name": "priority", "type": "uint256"},
                     {"internalType": "uint256", "name": "totalVotes", "type": "uint256"}
                 ],
@@ -174,6 +176,12 @@ def get_account_from_env() -> LocalAccount:
     if not mnemonic:
         raise RuntimeError("Set PRIVATE_KEY or MNEMONIC in environment for the agent account.")
     # Derive first account path m/44'/60'/0'/0/0
+    try:
+        # Enable HD wallet features required by eth-account for mnemonic derivation
+        Account.enable_unaudited_hdwallet_features()
+    except Exception:
+        # If already enabled or not required, continue
+        pass
     acct = Account.from_mnemonic(mnemonic)
     return acct
 
@@ -192,10 +200,20 @@ def ensure_public_key_onchain(
     except Exception:
         pass
 
+    # Estimating gas because storing a long PEM string can exceed a fixed gas limit
+    try:
+        estimated_gas = contract.functions.setPublicEncryptionKey(public_key_pem).estimate_gas({
+            "from": acct.address,
+        })
+    except Exception:
+        estimated_gas = 800_000  # fallback
+
+    gas_limit = min(3_000_000, int(estimated_gas * 2) + 50_000)
+
     tx = contract.functions.setPublicEncryptionKey(public_key_pem).build_transaction({
         "from": acct.address,
         "nonce": w3.eth.get_transaction_count(acct.address),
-        "gas": 350_000,
+        "gas": gas_limit,
         "maxFeePerGas": w3.to_wei(os.getenv("MAX_FEE_GWEI", "30"), "gwei"),
         "maxPriorityFeePerGas": w3.to_wei(os.getenv("MAX_PRIORITY_FEE_GWEI", "2"), "gwei"),
         "chainId": chain_id or w3.eth.chain_id,

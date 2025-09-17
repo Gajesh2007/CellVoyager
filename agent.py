@@ -280,10 +280,16 @@ class AnalysisAgent:
 
         if seeded:
             prompt = open(os.path.join(self.prompt_dir, "next_step_seeded.txt")).read()
-            prompt = prompt.format(hypothesis=hypothesis, analysis_plan = analysis_plan, num_steps_left=num_steps_left,
-                                 CODING_GUIDELINES=self.coding_guidelines, jupyter_notebook=jupyter_summary,
-                                 jupyter_notebook=jupyter_summary, adata_summary=self.adata_summary, past_analyses=attempted_analyses,
-                                 paper_txt=self.paper_summary)
+            prompt = prompt.format(
+                                hypothesis=hypothesis,
+                                analysis_plan=analysis_plan,
+                                num_steps_left=num_steps_left,
+                                CODING_GUIDELINES=self.coding_guidelines,
+                                jupyter_notebook=jupyter_summary,
+                                adata_summary=self.adata_summary,
+                                past_analyses=attempted_analyses,
+                                paper_txt=self.paper_summary
+                            )
         else:
             prompt = open(os.path.join(self.prompt_dir, "next_step.txt")).read()
             prompt = prompt.format(hypothesis=hypothesis, analysis_plan=analysis_plan,

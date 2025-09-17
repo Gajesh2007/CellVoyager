@@ -32,6 +32,8 @@ contract GovernanceQueue is Ownable, ReentrancyGuard {
         // Admin/meta
         address submitter;
         uint64 createdAt;
+        bool completed;
+        uint64 completedAt;
 
         // Governance
         uint256 priority; // accumulated priority from votes
@@ -95,6 +97,8 @@ contract GovernanceQueue is Ownable, ReentrancyGuard {
         r.maxIterations = maxIterations;
         r.submitter = msg.sender;
         r.createdAt = uint64(block.timestamp);
+        r.completed = false;
+        r.completedAt = 0;
         r.priority = 0;
         r.totalVotes = 0;
 
@@ -148,6 +152,16 @@ contract GovernanceQueue is Ownable, ReentrancyGuard {
         result = new Research[](n);
         for (uint256 i = 0; i < n; i++) {
             result[i] = _researches[offset + i];
+        }
+    }
+
+    /// @notice Mark a research as completed (agent only)
+    function markCompleted(uint256 id) external onlyAgent {
+        if (id >= _researches.length) revert InvalidResearch();
+        Research storage r = _researches[id];
+        if (!r.completed) {
+            r.completed = true;
+            r.completedAt = uint64(block.timestamp);
         }
     }
 }

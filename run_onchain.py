@@ -52,6 +52,15 @@ GOVERNANCE_QUEUE_ABI: List[Dict[str, Any]] = [
         "type": "function"
     },
     {
+        "inputs": [
+            {"internalType": "uint256", "name": "id", "type": "uint256"}
+        ],
+        "name": "markCompleted",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
         "inputs": [],
         "name": "researchCount",
         "outputs": [
@@ -284,6 +293,22 @@ def process_research_queue(
         log_home=log_home,
     )
     agent.run()
+
+    # Mark this research as completed on-chain (best-effort)
+    try:
+        tx = contract.functions.markCompleted(research_id).build_transaction({
+            "from": acct.address,
+            "nonce": w3.eth.get_transaction_count(acct.address),
+            "gas": 200_000,
+            "maxFeePerGas": w3.to_wei(os.getenv("MAX_FEE_GWEI", "30"), "gwei"),
+            "maxPriorityFeePerGas": w3.to_wei(os.getenv("MAX_PRIORITY_FEE_GWEI", "2"), "gwei"),
+            "chainId": w3.eth.chain_id,
+        })
+        signed = acct.sign_transaction(tx)
+        tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
+        w3.eth.wait_for_transaction_receipt(tx_hash)
+    except Exception as e:
+        print(f"⚠️ Failed to mark completed on-chain: {e}")
 
 
 def main() -> int:
